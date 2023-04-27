@@ -1,0 +1,112 @@
+print(geometry, 'Extent AOI');
+Map.addLayer(geometry, {},'Extent AOI');
+Map.centerObject(geometry , 12);
+
+
+var l2021 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA')
+    .filterDate('2021-07-01', '2021-07-31')
+    .filterBounds(geometry)
+    .map(function(image) {
+      return image.clip(geometry);
+    });
+
+
+var l2018 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA')
+    .filterDate('2018-07-01', '2018-07-31')
+    .filterBounds(geometry)
+    .map(function(image) {
+      return image.clip(geometry);
+    });
+    
+    
+
+//calculate ndvi 2021
+var ndvi_2021 = l2021.map(function(image) {
+  return image.select().addBands(image.normalizedDifference(['B5', 'B4']));
+});
+var l2021_2 = ndvi_2021.median()
+                    .clip(geometry);
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']};
+
+
+//calculate ndvi 2018
+var ndvi_2018 = l2018.map(function(image) {
+  return image.select().addBands(image.normalizedDifference(['B5', 'B4']));
+});
+var l2018_2 = ndvi_2018.median()
+                    .clip(geometry);
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']};
+
+
+
+
+
+
+
+
+
+
+
+// Create two maps for displaying images and NDWI layers side by side
+
+var leftMap = ui.Map();
+var rightMap = ui.Map();
+
+
+
+
+var l5_label = ui.Label( 'July 2021')
+l5_label.style().set( 'position', 'bottom-left')
+
+var l8_label = ui.Label('July 2018')
+l8_label.style().set('position', 'bottom-right' )
+
+var title = ui.Label('Morocco NDVI Comparison: July 2018 vs July 2021', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+var title2 = ui.Label('Morocco NDVI Comparison: July 2018 vs July 2021', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+
+leftMap.add(l5_label)
+rightMap.add(l8_label)
+leftMap.add(title)
+rightMap.add(title2)
+
+leftMap.addLayer(l2021_2, {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']},'NDVI 2021');
+
+
+rightMap.addLayer(l2018_2, {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']},'NDVI 2018');
+  
+var linker = ui.Map.Linker([leftMap, rightMap]);
+  
+ 
+// Create a split panel to display the two maps side by side
+var splitPanel = ui.SplitPanel({
+  firstPanel: leftMap,
+  secondPanel: rightMap,
+  wipe: true
+}); 
+  
+
+// Display the split panel
+ui.root.clear();
+ui.root.add(splitPanel);
+
+// Center the maps on the geometry
+leftMap.centerObject(geometry, 10);
+rightMap.centerObject(geometry, 10);  
+  
+  

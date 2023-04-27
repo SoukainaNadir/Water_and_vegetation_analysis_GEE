@@ -1,0 +1,130 @@
+//image 1
+var image1 = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(geometry)
+  .filterDate('2022-07-01', '2022-07-31')
+  .select(['B4', 'B3', 'B8','B2'])
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+  
+//image 2 
+var image2 = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(geometry)
+  .filterDate('2018-07-01', '2018-07-31')
+  .select(['B4', 'B3', 'B8','B2'])
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+
+
+
+//Print your ImageCollection to your console tab to inspect it
+print(image1, 'Image Collection Morocco July 2021');
+Map.centerObject(image1,9)
+
+print(image2, 'Image Collection Morocco July 2021');
+Map.centerObject(image2,9)
+
+
+//Step 3: Create a single Image by reducing by Median and clip it to the extent of the geometry
+var image1_median = image1.median()
+                    .clip(geometry);
+                    
+var image2_median = image2.median()
+.clip(geometry);
+
+//Print your Image to your console tab to inspect it
+print(image1_median, 'Median reduced Image Morocco July 2022');
+print(image2_median, 'Median reduced Image Morocco July 2018');
+
+
+// Calculate NDWI
+
+// Calculate NDWI for 2022 image
+var ndwi2022 = image1_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+Map.addLayer(ndwi2022, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2022');
+
+// Calculate NDWI for 2018 image
+var ndwi2018 = image2_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+Map.addLayer(ndwi2018, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2018');
+
+// Create NDWI mask
+var ndwiThreshold = ndwi2022.gte(0.0);
+var ndwiMask = ndwiThreshold.updateMask(ndwiThreshold);
+Map.addLayer(
+  ndwiThreshold,
+  { palette: ['black', 'white'] },
+  'NDWI Binary Mask'
+);
+Map.addLayer(ndwiMask, { palette: ['blue'] }, 'NDWI Mask');
+
+
+// Calculate NDWI
+
+// Calculate NDWI for 2022 image
+var ndwi2022 = image1_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+Map.addLayer(ndwi2022, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2022');
+
+// Calculate NDWI for 2018 image
+var ndwi2018 = image2_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+Map.addLayer(ndwi2018, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2018');
+
+// Create NDWI mask
+var ndwiThreshold = ndwi2022.gte(0.0);
+var ndwiMask = ndwiThreshold.updateMask(ndwiThreshold);
+Map.addLayer(
+  ndwiThreshold,
+  { palette: ['black', 'white'] },
+  'NDWI Binary Mask'
+);
+Map.addLayer(ndwiMask, { palette: ['blue'] }, 'NDWI Mask');
+
+// Add your Image as a map layer
+var visParams = {
+  'min': 400,
+  'max': [4000, 3000, 3000],
+  'bands': ['B4', 'B3', 'B2']
+};
+var leftMap = ui.Map()
+var rightMap = ui.Map()
+
+var l2022_img = ui.Map.Layer(image1_median, visParams, 'S2 Morocco July 2021');
+var l2018_img = ui.Map.Layer(image2_median, visParams, 'S2 Morocco July 2018');
+
+var l2022_layer = leftMap.layers()
+var l2018_layer = rightMap.layers()
+
+l2022_layer.add(l2022_img);
+l2018_layer.add(l2018_img);
+
+var l5_label = ui.Label( 'July 2021')
+l5_label.style().set( 'position', 'bottom-left')
+
+var l8_label = ui.Label('July 2018')
+l8_label.style().set('position', 'bottom-right' )
+
+var title = ui.Label('Morocco :July 2022 ', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+var title2 = ui.Label('Morocco :July 2018', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+
+leftMap.add(l5_label)
+rightMap.add(l8_label)
+leftMap.add(title)
+rightMap.add(title2)
+
+var splitPanel = ui.SplitPanel({
+  firstPanel: leftMap,
+  secondPanel: rightMap,
+  orientation: 'horizontal',
+  wipe: true
+});
+
+ui.root.clear();
+ui.root.add(splitPanel);
+
+var linkPanel = ui.Map.Linker([leftMap, rightMap]);
+
+leftMap.centerObject(geometry, 10); 

@@ -1,0 +1,30 @@
+
+var s2a = ee.ImageCollection('COPERNICUS/S2_SR')
+                  .filterBounds(geometry)
+                  .filterDate('2017-07-01', '2017-07-31')
+                  .select('B1','B2','B3','B4','B5','B6','B7','B8','B8A','B9','B11','B12')
+                  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+
+//Print your ImageCollection to your console tab to inspect it
+print(s2a, 'Image Collection Lebanon July 2020');
+Map.centerObject(s2a,9)
+
+
+//Step 3: Create a single Image by reducing by Median and clip it to the extent of the geometry
+var s2a_median = s2a.median()
+                    .clip(geometry);
+
+//Print your Image to your console tab to inspect it
+print(s2a_median, 'Median reduced Image Lebanon July 2020');
+
+//Add your Image as a map layer
+var visParams = {'min': 400,'max': [4000,3000,3000],   'bands':'B8,B4,B3'};
+Map.addLayer(s2a_median, visParams, 'S2 Lebanon July 2020 Median');
+var landcover =s2a_median.select('landcover');
+
+var title = ui.Label('Land Cover Unsupervised Classification', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+Map.add(title)

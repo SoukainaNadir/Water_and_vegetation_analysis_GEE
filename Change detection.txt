@@ -1,0 +1,76 @@
+print(geometry, 'Extent AOI');
+Map.addLayer(geometry, {},'Extent AOI');
+Map.centerObject(geometry , 12);
+
+
+var l2021 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA')
+    .filterDate('2021-07-01', '2021-07-31')
+    .filterBounds(geometry)
+    .map(function(image) {
+      return image.clip(geometry);
+    });
+
+
+var l2018 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA')
+    .filterDate('2018-07-01', '2018-07-31')
+    .filterBounds(geometry)
+    .map(function(image) {
+      return image.clip(geometry);
+    });
+
+//calculate ndvi 2021
+var ndvi = l2021.map(function(image) {
+  return image.select().addBands(image.normalizedDifference(['B5', 'B4']));
+});
+var l2021_2 = ndvi.median()
+                    .clip(geometry);
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']};
+Map.addLayer(ndvi, vis, 'NDVI 2021');
+
+//calculate ndvi 2018
+var ndvi = l2018.map(function(image) {
+  return image.select().addBands(image.normalizedDifference(['B5', 'B4']));
+});
+var l2018_2 = ndvi.median()
+                    .clip(geometry);
+var vis = {min: 0, max: 1, palette: [
+  'FFFFFF', 'CE7E45', 'FCD163', '66A000', '207401',
+  '056201', '004C00', '023B01', '012E01', '011301']};
+Map.addLayer(ndvi, vis, 'NDVI 2018');
+
+
+
+var inspector = ui.Panel({
+  layout: ui.Panel.Layout.flow('horizontal')
+});
+inspector.add(ui.Label('Click to get mean NDVI'));
+Map.add(inspector);
+Map.style().set('cursor', 'crosshair');
+Map.onClick(function(coords) {
+  inspector.clear();
+  inspector.style().set('shown', true);
+  inspector.add(ui.Label('Loading...', {color: 'gray'}));
+  var point = ee.Geometry.Point(coords.lon, coords.lat);
+  var temporalMean = ndvi.reduce(ee.Reducer.mean());
+  var sampledPoint = temporalMean.reduceRegion(ee.Reducer.mean(), point, 30);
+  var computedValue = sampledPoint.get('nd_mean');
+computedValue.evaluate(function(result) {
+    inspector.clear();
+    inspector.add(ui.Label({
+      value: 'Mean NDVI: ' + result.toFixed(2),
+      style: {stretch: 'vertical'}
+    }));
+inspector.add(ui.Button({
+      label: 'Close',
+      onClick: function() {
+        inspector.style().set('shown', false);
+      }
+    }));
+  });
+});
+  
+var image_diff = l2018_2.subtract(l2021_2)
+
+Map.addLayer(image_diff,vis,'Change detection')

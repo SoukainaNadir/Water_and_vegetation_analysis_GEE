@@ -1,0 +1,146 @@
+
+
+// Load Sentinel-2 image collections for July 2018 and July 2022
+var image1 = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(geometry)
+  .filterDate('2022-07-01', '2022-07-31')
+  .select(['B4', 'B3', 'B8'])
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+  
+var image2 = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(geometry)
+  .filterDate('2018-07-01', '2018-07-31')
+  .select(['B4', 'B3', 'B8'])
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+
+// Reduce each image collection to a single image by taking the median and clip to the geometry
+var image1_median = image1.median().clip(geometry);
+var image2_median = image2.median().clip(geometry);
+
+// Calculate NDWI for both images
+var ndwi2022 = image1_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+var ndwi2018 = image2_median.normalizedDifference(['B3', 'B8']).rename('NDWI');
+
+// Create NDWI mask
+var ndwiThreshold = ndwi2022.gte(0.0);
+var ndwiMask = ndwiThreshold.updateMask(ndwiThreshold);
+
+// Add your Image as a map layer
+var visParams = {
+  'min': 400,
+  'max': [4000, 3000, 3000],
+  'bands': ['B4', 'B3', 'B2']
+};
+
+var maskParams = {
+  palette: ['blue','black'],
+  opacity: 0.3
+};
+
+// Create two maps for displaying images and NDWI layers side by side
+var leftMap = ui.Map();
+var rightMap = ui.Map();
+
+var l5_label = ui.Label( 'July 2022')
+l5_label.style().set( 'position', 'bottom-left')
+
+var l8_label = ui.Label('July 2018')
+l8_label.style().set('position', 'bottom-right' )
+
+var title = ui.Label('Morocco NDWI Comparison: July 2018 vs July 2022', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+var title2 = ui.Label('Morocco NDWI Comparison: July 2018 vs July 2022', {
+  fontWeight: 'bold', 
+  fontSize: '20px', 
+  padding: '0px 10px 0px 10px', // top right bottom left
+});
+
+leftMap.add(l5_label)
+rightMap.add(l8_label)
+leftMap.add(title)
+rightMap.add(title2)
+
+
+
+// Create NDWI mask
+var ndwiThreshold2022 = ndwi2022.gte(0.0);
+var ndwiMask2022 = ndwiThreshold2022.updateMask(ndwiThreshold2022);
+
+var ndwiThreshold2018 = ndwi2018.gte(0.0);
+var ndwiMask2018 = ndwiThreshold2018.updateMask(ndwiThreshold2018);
+
+// Add the image layers for 2022 and 2018 to the maps
+leftMap.addLayer(ndwi2022, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2022');
+
+
+
+rightMap.addLayer(ndwi2018, {palette: ['red', 'yellow', 'green', 'cyan', 'blue']}, 'NDWI 2018');
+
+
+
+
+
+
+
+
+// Link the two maps so that they are synchronized
+var linker = ui.Map.Linker([leftMap, rightMap]);
+
+// Create a split panel to display the two maps side by side
+var splitPanel = ui.SplitPanel({
+  firstPanel: leftMap,
+  secondPanel: rightMap,
+  wipe: true
+});
+
+// Display the split panel
+ui.root.clear();
+ui.root.add(splitPanel);
+
+// Center the maps on the geometry
+leftMap.centerObject(geometry, 10);
+rightMap.centerObject(geometry, 10);
+
+// Export the image, specifying the CRS, transform, and region.
+/**Export.image.toDrive({
+  image: ndwiThreshold2022.visualize({min:0, max:1}),
+  description: 'NDWI binary mask',
+  crs: 'EPSG:4326',
+  scale: 10,
+  region: geometry
+});**/
+
+
+// We can now calculate the masked areas pixel area
+var ndwiPixelArea =
+    ee.Image.pixelArea().addBands(
+        ndwiMask2022.select('NDWI')).divide(1e6).reduceRegion({
+            reducer: ee.Reducer.sum().group(1),
+            geometry: geometry,
+            scale: 10,
+            bestEffort: true
+});
+
+var list = ee.List(ee.Dictionary(ndwiPixelArea).get('groups'));
+var group0 = ee.Dictionary(list.get(0));
+var ndwiWaterArea = ee.Number(group0.get('sum')).float();
+
+print("Water area (km2):", ndwiWaterArea);
+
+var ndwiPixelArea =
+    ee.Image.pixelArea().addBands(
+        ndwiMask2018.select('NDWI')).divide(1e6).reduceRegion({
+            reducer: ee.Reducer.sum().group(1),
+            geometry: geometry,
+            scale: 10,
+            bestEffort: true
+});
+
+var list = ee.List(ee.Dictionary(ndwiPixelArea).get('groups'));
+var group0 = ee.Dictionary(list.get(0));
+var ndwiWaterArea = ee.Number(group0.get('sum')).float();
+
+print("Water area (km2):", ndwiWaterArea);
